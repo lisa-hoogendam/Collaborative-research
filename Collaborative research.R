@@ -9,6 +9,7 @@ library(meta)
 library(grid)
 library(esc)
 library(broom)
+library(skimr)
 
 # Change number of decimals that are displayed as default
 options("scipen" = 100, "digits"=3)
@@ -18,16 +19,24 @@ load("~/Documents/GitHub/PulseR/Personal stuff/Lisa H/EMC_set_MHQ.Rdata")
 
 # Remove patients with missing values
 EMC_set_MHQ <- EMC_set_MHQ %>%
+  select(Patient.traject.ID, Respondent.ID, behandeling, locatie, totaalscore_aangedane_hand_Int, totaalscore_aangedane_hand_3m, score_esthetica_aangedane_hand_Int, score_esthetica_aangedane_hand_3m, primairRecidief, Leeftijd, Geslacht, hoeLangKlacht, zwaarteBeroep) %>% 
   filter(!is.na(totaalscore_aangedane_hand_3m)&!is.na(totaalscore_aangedane_hand_Int)) %>% 
   droplevels()
 
 # Create separate datasets per center and per treatment
 Amsterdam <- EMC_set_MHQ %>%
   filter(locatie == "Amsterdam")
+Descriptive_stats_Amsterdam <- skim(Amsterdam)
+write.table(Descriptive_stats_Amsterdam, file = "Descriptive_stats_Amsterdam.txt", sep = ";", quote = FALSE, row.names = F) # The data from this file can be copy pasted to word and converted into a table
+# In word, select the copied data and go to "Table" --> "Convert" --> "Convert text to table"
+# Choose ";" under "separate text as"
+# This word file can be send to researchers at the coordinating center
 Eindhoven <- EMC_set_MHQ %>%
   filter(locatie == "Eindhoven")
+skim(Amsterdam)
 Rotterdam <- EMC_set_MHQ %>%
   filter(locatie == "Rotterdam")
+skim(Amsterdam)
 
 # Create Table 1
 variables <- c("Leeftijd", "Geslacht", "hoeLangKlacht", "zwaarteBeroep", "behandeling")
@@ -105,6 +114,25 @@ meta_vergelijking <- metacont(n.e = N_LF, mean.e = Mean_MHQ_totaal_LF, sd.e = SD
 
 forest(meta_vergelijking)
 
+# Sample size calculation for incidences ----
+# multicenter
+# We aim to detect a difference in proportion patients treated for a recurrence between limited fasciectomy and needle aponeurotomy
+# We expect that 10% of all needle aponeurotomy patients is treated for a recurrence, compared to 30% of all limited fasciectomy patients 
+library(pwr)
+pwr.2p.test(h = ES.h(p1 = 0.10, p2 = 0.30), sig.level = 0.05, power = .80) # Sample size calculation
+# The sample size calculation indicated that, to detect such a difference, we need at least 59 patients per treatment
+pwr.2p2n.test(h = ES.h(p1 = 0.10, p2 = 0.30), n1 = 75, n2 = 225, sig.level = 0.05) # Power calculation
+
+
+# single center
+# n1 and n2 are the average sample sizes in each trial arm we assume across our studies
+# We assume that 25% of the patients is treated with needle aponeurotomy, compared to 75% limited fasciectomy
+library(dmetar)
+p1 <- 0.10
+p2 <- 0.30 
+OR <- (p2*(1-p1))/(p1*(1-p2)) # Convert proportions to odds ratio
+power.analysis(OR = OR, k=3, n1 = 25, n2 = 75, heterogeneity = "low")
+# The power calculation indicated that, with the specified difference, 3 locations, and 25 needle aponeurotomy patients and 75 limited fasciectomy patients per location, we have sufficient power (Power: 99.98%)
 
 # Proportion of treatment for recurrences (multicenter) -------
 perc_multicenter <- EMC_set_MHQ %>%
